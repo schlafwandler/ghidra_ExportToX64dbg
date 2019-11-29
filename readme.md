@@ -1,7 +1,7 @@
 # ExportToX64dbg
 A Ghidra script to export information to a x64dbg database.
 
-![Screenshot x64dbg](https://github.com/schlafwandler/ghidra_ExportToX64dbg/img/x64dbg_vsimple.png)
+![Screenshot x64dbg](https://github.com/schlafwandler/ghidra_ExportToX64dbg/blob/master/img/x64dbg_vsimple.png)
 
 ## Features
   * Exports functions, function names (as labels), and function prototypes (as comments)
