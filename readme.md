@@ -20,10 +20,13 @@ If the script is not shown in the Script Manager, try the 'Refresh Script List` 
 
 ## Bugs/Limitations
   * Not the full decompiled source code gets exported as comments
+  
 At the moment the source code export is limited to elements that appear as `ClangStatement` in the `ClangTokenGroup` returned by `getCCodeMarkup()`.
 This works fine for most variable assignments and function calls, but excludes most control flow altering constructs (like `if`, `for` or `while`).
 
 ## Similar projects
 [GhidraX64Dbg](https://github.com/revolver-ocelot-saa/GhidraX64Dbg)
+
 [ret-sync](https://github.com/bootleg/ret-sync)
+
 [lst2x64dbg](https://github.com/utkonos/lst2x64dbg)
