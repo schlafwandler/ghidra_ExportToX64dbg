@@ -5,10 +5,7 @@
 #@menupath 
 #@toolbar 
 
-import operator
-import os.path
 import json
-import copy
 
 def fixdata(obj_list):
     """
@@ -50,9 +47,6 @@ def main():
 
     if not output_filename.endswith(suffix):
         output_filename = output_filename + suffix
-
-
-    module_name = currentProgram.getName()
     
     functions,function_labels,prototype_comments = get_functions_labels()
     data_labels = get_data_labels()
@@ -76,13 +70,12 @@ def get_functions_labels():
     module_name = currentProgram.getName()
     imagebase = currentProgram.getImageBase().getOffset()
 
-    listing = currentProgram.getListing()
-    for f in currentProgram.functionManager.getFunctionsNoStubs(1):
+    fm = currentProgram.getFunctionManager()
+    for f in fm.getFunctionsNoStubs(1):
         monitor.checkCanceled() # throws exception if canceled
 
         if f.isExternal() or f.isThunk():
             next
-        #print (f.getName())
 
         function_entry = dict()
         function_entry["module"]    = module_name
@@ -114,7 +107,6 @@ def get_data_labels():
     monitor.setMessage("Collecting data labels")
 
     labels = list()
-    prototype_comments = list()
     module_name = currentProgram.getName()
     imagebase = currentProgram.getImageBase().getOffset()
 
@@ -126,8 +118,6 @@ def get_data_labels():
         
         if label:
             text = label
-#        elif path:
-#            text = path
         else:
             text = None
 
@@ -140,8 +130,6 @@ def get_data_labels():
             label_entry["text"]     = text
             labels.append(label_entry)
 
-            #d.getReferenceIteratorTo().next()
-            #print("%s\t%s"%(label,list(d.getValueReferences())))
     return labels
 
 def get_bookmarks():
@@ -176,8 +164,8 @@ def get_bookmarks():
     
 def get_clang_statements(): 
     monitor.setMessage("Collecting C statements")
-    import ghidra.app.decompiler.DecompInterface as DecompInterface
-    import ghidra.app.decompiler.ClangStatement as ClangStatement
+    from ghidra.app.decompiler import DecompInterface
+    from ghidra.app.decompiler import ClangStatement
 
     module_name = currentProgram.getName()
     imagebase = currentProgram.getImageBase().getOffset()
@@ -193,8 +181,8 @@ def get_clang_statements():
                 token_walker(node.Child(i),list)
 
     statement_nodes = list()
-    listing = currentProgram.getListing()
-    for f in currentProgram.functionManager.getFunctionsNoStubs(1):
+    function_manager = currentProgram.getFunctionManager()
+    for f in function_manager.getFunctionsNoStubs(1):
         monitor.checkCanceled() # throws exception if canceled
         
         decres = decomp.decompileFunction(f,1000,monitor)
