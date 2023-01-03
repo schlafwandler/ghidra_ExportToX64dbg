@@ -16,11 +16,11 @@ def fixdata(obj_list):
 
         # fix addresses
         if "address" in entry:
-            entry["address"] = hex(entry["address"])[:-1] # strip trailing 'L'
+            entry["address"] = hex(entry["address"])
         if "start" in entry:
-            entry["start"] = hex(entry["start"])[:-1] # strip trailing 'L'
+            entry["start"] = hex(entry["start"])#[:-1] # strip trailing 'L'
         if "end" in entry:
-            entry["end"] = hex(entry["end"])[:-1] # strip trailing 'L'
+            entry["end"] = hex(entry["end"])#[:-1] # strip trailing 'L'
         # fix module name
         if "module" in entry:
             entry["module"] = entry["module"].lower()
@@ -52,13 +52,14 @@ def main():
     data_labels = get_data_labels()
     bookmarks,bookmark_comments = get_bookmarks()
     statement_comments = get_clang_statements()
+    comments = get_comments()
 
     data = dict()
     data["labels"] = function_labels + data_labels
-    data["comments"] = prototype_comments + statement_comments + bookmark_comments
+    data["comments"] = prototype_comments + statement_comments + bookmark_comments + comments
     data["functions"] = functions
     data["bookmarks"] = bookmarks
-
+    
     export_json(output_filename,data)
 
 def get_functions_labels():
@@ -160,6 +161,11 @@ def get_bookmarks():
         bookmark_comment_entry["text"]      = b.getCategory() + ": " + b.getComment()
         bookmark_comments.append(bookmark_comment_entry)
 
+        comment_addr = (getInstructionAfter(getInstructionAfter(item.getFromAddress()))).getAddress()
+        listing = currentProgram.getListing()
+        codeUnit = listing.getCodeUnitAt(comment_addr)
+        codeUnit.setComment(codeUnit.EOL_COMMENT, '[*] ' + decoded_str)
+
     return bookmarks, bookmark_comments
     
 def get_clang_statements(): 
@@ -200,7 +206,44 @@ def get_clang_statements():
 
     return statements
         
+def get_comments():
+    monitor.setMessage("Collecting comments")
 
+    from ghidra.app.util import DisplayableEol
+
+    module_name = currentProgram.getName()
+    imagebase = currentProgram.getImageBase().getOffset()
+
+    comments = list()
+
+    fm = currentProgram.getFunctionManager()
+    listing = currentProgram.getListing()
+    funcs = fm.getFunctions(True) # True means iterate forward
+
+    comment_types = { 
+        0: 'EOL', 
+        1: 'PRE', 
+        2: 'POST',
+        3: 'PLATE',
+        4: 'REPEATABLE',
+    }
+
+    for func in funcs: 
+        addrSet = func.getBody()
+        codeUnits = listing.getCodeUnits(addrSet, True)
+        for codeUnit in codeUnits:
+            for i, comment_type in comment_types.items():
+                comment = codeUnit.getComment(i)
+
+                if comment is not None:
+                    comment_entry = dict()
+                    comment_entry["module"]    = module_name
+                    comment_entry["address"]   = int(str(codeUnit.getAddress()), 16) - imagebase
+                    comment_entry["manual"]    = False
+                    comment_entry["text"]      = comment_type + ": " + comment
+                    comments.append(comment_entry)
+
+    return comments
 
 
 main()
