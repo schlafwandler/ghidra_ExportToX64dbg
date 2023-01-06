@@ -1,11 +1,13 @@
-# Export function names to x64dbg
-#@author schlafwandler
+# Export function names and comments to x64dbg
+#@author schlafwandler (Updated by charleslomboni)
 #@category Examples
 #@keybinding 
 #@menupath 
 #@toolbar 
 
 import json
+from ghidra.app.decompiler import DecompInterface
+from ghidra.app.decompiler import ClangStatement
 
 def fixdata(obj_list):
     """
@@ -25,7 +27,6 @@ def fixdata(obj_list):
         if "module" in entry:
             entry["module"] = entry["module"].lower()
 
-
 def export_json(filename, data, lowercase_modulename=True):
     monitor.setMessage("Exporting data")
     
@@ -35,7 +36,6 @@ def export_json(filename, data, lowercase_modulename=True):
 
     with open(filename,"w") as f:
         json.dump(data,f,sort_keys=True,indent=4)
-
 
 def main():
     output_filename = str(askFile("Select output file name","Save"))
@@ -170,8 +170,6 @@ def get_bookmarks():
     
 def get_clang_statements(): 
     monitor.setMessage("Collecting C statements")
-    from ghidra.app.decompiler import DecompInterface
-    from ghidra.app.decompiler import ClangStatement
 
     module_name = currentProgram.getName()
     imagebase = currentProgram.getImageBase().getOffset()
@@ -244,6 +242,5 @@ def get_comments():
                     comments.append(comment_entry)
 
     return comments
-
 
 main()
