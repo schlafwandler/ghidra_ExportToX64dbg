@@ -1,14 +1,13 @@
-# Export function names to x64dbg
-#@author schlafwandler
+# Export function names and comments to x64dbg
+#@author schlafwandler (Updated by charleslomboni)
 #@category Examples
 #@keybinding 
 #@menupath 
 #@toolbar 
 
-import operator
-import os.path
 import json
-import copy
+from ghidra.app.decompiler import DecompInterface
+from ghidra.app.decompiler import ClangStatement
 
 def fixdata(obj_list):
     """
@@ -19,15 +18,14 @@ def fixdata(obj_list):
 
         # fix addresses
         if "address" in entry:
-            entry["address"] = hex(entry["address"])[:-1] # strip trailing 'L'
+            entry["address"] = hex(entry["address"])
         if "start" in entry:
-            entry["start"] = hex(entry["start"])[:-1] # strip trailing 'L'
+            entry["start"] = hex(entry["start"])#[:-1] # strip trailing 'L'
         if "end" in entry:
-            entry["end"] = hex(entry["end"])[:-1] # strip trailing 'L'
+            entry["end"] = hex(entry["end"])#[:-1] # strip trailing 'L'
         # fix module name
         if "module" in entry:
             entry["module"] = entry["module"].lower()
-
 
 def export_json(filename, data, lowercase_modulename=True):
     monitor.setMessage("Exporting data")
@@ -39,7 +37,6 @@ def export_json(filename, data, lowercase_modulename=True):
     with open(filename,"w") as f:
         json.dump(data,f,sort_keys=True,indent=4)
 
-
 def main():
     output_filename = str(askFile("Select output file name","Save"))
 
@@ -50,21 +47,19 @@ def main():
 
     if not output_filename.endswith(suffix):
         output_filename = output_filename + suffix
-
-
-    module_name = currentProgram.getName()
     
     functions,function_labels,prototype_comments = get_functions_labels()
     data_labels = get_data_labels()
     bookmarks,bookmark_comments = get_bookmarks()
     statement_comments = get_clang_statements()
+    comments = get_comments()
 
     data = dict()
     data["labels"] = function_labels + data_labels
-    data["comments"] = prototype_comments + statement_comments + bookmark_comments
+    data["comments"] = prototype_comments + statement_comments + bookmark_comments + comments
     data["functions"] = functions
     data["bookmarks"] = bookmarks
-
+    
     export_json(output_filename,data)
 
 def get_functions_labels():
@@ -76,13 +71,12 @@ def get_functions_labels():
     module_name = currentProgram.getName()
     imagebase = currentProgram.getImageBase().getOffset()
 
-    listing = currentProgram.getListing()
-    for f in currentProgram.functionManager.getFunctionsNoStubs(1):
+    fm = currentProgram.getFunctionManager()
+    for f in fm.getFunctionsNoStubs(1):
         monitor.checkCanceled() # throws exception if canceled
 
         if f.isExternal() or f.isThunk():
             next
-        #print (f.getName())
 
         function_entry = dict()
         function_entry["module"]    = module_name
@@ -114,7 +108,6 @@ def get_data_labels():
     monitor.setMessage("Collecting data labels")
 
     labels = list()
-    prototype_comments = list()
     module_name = currentProgram.getName()
     imagebase = currentProgram.getImageBase().getOffset()
 
@@ -126,8 +119,6 @@ def get_data_labels():
         
         if label:
             text = label
-#        elif path:
-#            text = path
         else:
             text = None
 
@@ -140,8 +131,6 @@ def get_data_labels():
             label_entry["text"]     = text
             labels.append(label_entry)
 
-            #d.getReferenceIteratorTo().next()
-            #print("%s\t%s"%(label,list(d.getValueReferences())))
     return labels
 
 def get_bookmarks():
@@ -172,12 +161,15 @@ def get_bookmarks():
         bookmark_comment_entry["text"]      = b.getCategory() + ": " + b.getComment()
         bookmark_comments.append(bookmark_comment_entry)
 
+        comment_addr = (getInstructionAfter(getInstructionAfter(item.getFromAddress()))).getAddress()
+        listing = currentProgram.getListing()
+        codeUnit = listing.getCodeUnitAt(comment_addr)
+        codeUnit.setComment(codeUnit.EOL_COMMENT, '[*] ' + decoded_str)
+
     return bookmarks, bookmark_comments
     
 def get_clang_statements(): 
     monitor.setMessage("Collecting C statements")
-    import ghidra.app.decompiler.DecompInterface as DecompInterface
-    import ghidra.app.decompiler.ClangStatement as ClangStatement
 
     module_name = currentProgram.getName()
     imagebase = currentProgram.getImageBase().getOffset()
@@ -193,8 +185,8 @@ def get_clang_statements():
                 token_walker(node.Child(i),list)
 
     statement_nodes = list()
-    listing = currentProgram.getListing()
-    for f in currentProgram.functionManager.getFunctionsNoStubs(1):
+    function_manager = currentProgram.getFunctionManager()
+    for f in function_manager.getFunctionsNoStubs(1):
         monitor.checkCanceled() # throws exception if canceled
         
         decres = decomp.decompileFunction(f,1000,monitor)
@@ -212,7 +204,43 @@ def get_clang_statements():
 
     return statements
         
+def get_comments():
+    monitor.setMessage("Collecting comments")
 
+    from ghidra.app.util import DisplayableEol
 
+    module_name = currentProgram.getName()
+    imagebase = currentProgram.getImageBase().getOffset()
+
+    comments = list()
+
+    fm = currentProgram.getFunctionManager()
+    listing = currentProgram.getListing()
+    funcs = fm.getFunctions(True) # True means iterate forward
+
+    comment_types = { 
+        0: 'EOL', 
+        1: 'PRE', 
+        2: 'POST',
+        3: 'PLATE',
+        4: 'REPEATABLE',
+    }
+
+    for func in funcs: 
+        addrSet = func.getBody()
+        codeUnits = listing.getCodeUnits(addrSet, True)
+        for codeUnit in codeUnits:
+            for i, comment_type in comment_types.items():
+                comment = codeUnit.getComment(i)
+
+                if comment is not None:
+                    comment_entry = dict()
+                    comment_entry["module"]    = module_name
+                    comment_entry["address"]   = int(str(codeUnit.getAddress()), 16) - imagebase
+                    comment_entry["manual"]    = False
+                    comment_entry["text"]      = comment_type + ": " + comment
+                    comments.append(comment_entry)
+
+    return comments
 
 main()
